@@ -5,6 +5,11 @@ import psycopg2
 import psycopg2.extras
 import streamlit as st
 
+# This file duplicates the query logic in orchestrator/db.py rather than
+# importing it (separate containers/images — see CLAUDE.md). If you change
+# the `runs` table schema (scripts/init_db.sql), update both this file and
+# orchestrator/db.py in lockstep.
+
 POSTGRES_DSN = (
     f"host={os.environ.get('POSTGRES_HOST', 'postgres')} "
     f"port={os.environ.get('POSTGRES_PORT', '5432')} "

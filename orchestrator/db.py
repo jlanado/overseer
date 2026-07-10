@@ -4,6 +4,11 @@ from contextlib import contextmanager
 
 from config import settings
 
+# approval-ui/app.py duplicates the query logic here rather than importing
+# this module (separate containers/images — see CLAUDE.md). If you change
+# the `runs` table schema (scripts/init_db.sql), update both files in
+# lockstep.
+
 
 @contextmanager
 def get_conn():
