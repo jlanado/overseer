@@ -11,7 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get update && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin \
     && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g @anthropic-ai/claude-code
+# Pin to a known-working version — an unpinned `npm install -g` here would
+# make the Fixer node's exact behavior drift between rebuilds. Bump
+# deliberately; check the Claude Code changelog when you do.
+RUN npm install -g @anthropic-ai/claude-code@2.1.206
 
 WORKDIR /app
 COPY requirements.txt .

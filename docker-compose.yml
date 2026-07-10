@@ -21,7 +21,7 @@ services:
       retries: 10
 
   gitea:
-    image: gitea/gitea:latest
+    image: gitea/gitea:1.26.4
     container_name: overseer-gitea
     restart: unless-stopped
     environment:
@@ -48,7 +48,7 @@ services:
       start_period: 20s
 
   runner:
-    image: gitea/runner:latest
+    image: gitea/runner:2.0.1
     container_name: overseer-runner
     restart: unless-stopped
     environment:
@@ -112,7 +112,7 @@ services:
   # Requires LANGFUSE_NEXTAUTH_SECRET / LANGFUSE_SALT / LANGFUSE_ENCRYPTION_KEY
   # set in .env (see .env.example for how to generate).
   langfuse:
-    image: langfuse/langfuse:latest
+    image: langfuse/langfuse:3.210.0
     container_name: overseer-langfuse
     restart: unless-stopped
     profiles: ["observability"]
