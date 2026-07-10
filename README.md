@@ -179,6 +179,12 @@ docker compose up -d --build orchestrator approval-ui
 docker compose up -d runner
 ```
 
+`.env` is gitignored and never committed. For structural checks (does everything build, does
+`docker compose config` validate, do the orchestrator's own tests pass) placeholder values are
+enough — a real `ANTHROPIC_API_KEY` is only needed once you're triggering an actual pipeline run.
+If you created a throwaway `.env` just to validate the stack, delete it (`rm .env`) afterward
+rather than leaving dummy credentials sitting in a real checkout.
+
 Then in Gitea:
 1. Create a repo (or push the `example-target-app/` folder as your first test repo).
 2. Repo Settings → Webhooks → Add Webhook → Gitea format.
