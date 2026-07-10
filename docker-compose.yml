@@ -78,6 +78,13 @@ services:
     env_file: .env
     environment:
       - POSTGRES_HOST=postgres
+      # LiteLLM proxy mode (leave .env's LITELLM_BASE_URL empty to use
+      # direct Anthropic API instead — see .env.example for both modes)
+      - LITELLM_BASE_URL=${LITELLM_BASE_URL}
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL}
+      - ANTHROPIC_SMALL_FAST_MODEL=${ANTHROPIC_SMALL_FAST_MODEL}
+      - REVIEWER_MODEL=${REVIEWER_MODEL}
     ports:
       - "8000:8000"
     volumes:

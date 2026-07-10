@@ -206,12 +206,36 @@ Services once running:
 | Orchestration | LangGraph |
 | Multi-agent reasoning | CrewAI (Reviewer, Security agents) |
 | Code fixing | Claude Code (Agent SDK, headless `-p` mode) |
+| Model backend | Direct Anthropic API, **or** a self-hosted LiteLLM proxy routing to local models (Ollama) — see below |
 | Git hosting | Gitea |
 | CI runner (optional, separate lint/test lane) | `gitea/runner` |
 | Registry | `registry:2` |
 | Approval UI | Streamlit |
 | State | Postgres |
 | Observability (optional) | Langfuse |
+
+### Model backend modes
+
+Overseer supports two backends, switched entirely via `.env` — no code
+changes needed:
+
+| Mode | Set in `.env` | Cost | Fixer quality |
+|---|---|---|---|
+| **A — Direct Anthropic** | `ANTHROPIC_API_KEY` | Pay per token | Best — Claude Code runs against real Claude models |
+| **B — LiteLLM proxy (local models)** | `LITELLM_BASE_URL`, `LITELLM_API_KEY`, `ANTHROPIC_MODEL`, `ANTHROPIC_SMALL_FAST_MODEL`, `REVIEWER_MODEL` | Free (self-hosted) | Lower — local 7B–14B models are noticeably weaker at multi-file, tool-using edits; expect more Fixer retries |
+
+In Mode B, both the CrewAI Reviewer/Security agents **and** Claude Code's
+Fixer step route through the same LiteLLM proxy — Claude Code via
+`ANTHROPIC_BASE_URL`/`ANTHROPIC_AUTH_TOKEN`, which it treats as a drop-in
+replacement for the real Anthropic endpoint since LiteLLM speaks the
+Anthropic Messages API. `ANTHROPIC_MODEL`/`ANTHROPIC_SMALL_FAST_MODEL`
+remap Claude Code's internal `sonnet`/`haiku` aliases to real model names
+registered in the proxy.
+
+If you route the Reviewer to a reasoning model (e.g. DeepSeek-R1 via
+Ollama), note it emits `<think>...</think>` traces before its answer —
+`reviewer.py` strips these before parsing JSON, but it's worth a quick
+manual test call against your proxy to confirm the raw output shape first.
 
 ---
 
@@ -305,9 +329,16 @@ simplifications, called out on purpose rather than hidden:
   full self-hosted setup needs its own secrets (NEXTAUTH_SECRET, SALT,
   ENCRYPTION_KEY) — see comments in `docker-compose.yml`.
 - **CrewAI agents use the Anthropic API directly** (via `ANTHROPIC_API_KEY`)
-  for reasoning tasks (review, security triage). Claude Code itself is only
-  invoked for the Fixer step, since that's the one step that needs real file
-  edits and repo-aware tool use.
+  for reasoning tasks (review, security triage) in Mode A, or the LiteLLM
+  proxy in Mode B. Claude Code itself is only invoked for the Fixer step,
+  since that's the one step that needs real file edits and repo-aware
+  tool use.
+- **If running Mode B (LiteLLM), pin your LiteLLM version deliberately.**
+  Anthropic's own gateway docs have flagged specific past LiteLLM PyPI
+  releases as compromised with credential-stealing malware. Check
+  `pip show litellm` before relying on a proxy for anything beyond local
+  experimentation, and rotate credentials if an affected version was ever
+  installed.
 
 ---
 

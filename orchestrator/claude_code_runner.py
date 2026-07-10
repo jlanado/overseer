@@ -4,20 +4,50 @@ Thin wrapper around the Claude Code CLI's headless (`-p`) mode.
 Used by the Fixer node — the one step in the pipeline that needs real,
 repo-aware file edits rather than just reasoning over text. Everything else
 (Reviewer, Security) reasons over a diff/output as plain text via CrewAI +
-the Anthropic API directly, since they don't need to touch files.
+either the Anthropic API or the same LiteLLM proxy, since they don't need
+to touch files.
 
-Auth: uses ANTHROPIC_API_KEY from the environment. In headless (-p) mode,
-Claude Code prefers an API key over any subscription credential when both
-are present, which is exactly the deterministic behavior wanted here since
-Overseer wraps Claude Code inside a larger orchestrated pipeline rather than
-using it as a standalone interactive tool.
+Auth — two modes, controlled by whether LITELLM_BASE_URL is set:
+
+  Mode A (direct Anthropic): ANTHROPIC_API_KEY is used as-is. In headless
+  (-p) mode, Claude Code prefers an API key over any subscription credential
+  when both are present — the deterministic behavior wanted here since
+  Overseer wraps Claude Code inside a larger orchestrated pipeline.
+
+  Mode B (LiteLLM proxy, e.g. local Ollama models): Claude Code is pointed
+  at the proxy via ANTHROPIC_BASE_URL / ANTHROPIC_AUTH_TOKEN instead.
+  ANTHROPIC_MODEL / ANTHROPIC_SMALL_FAST_MODEL remap Claude Code's hardcoded
+  sonnet/opus/haiku aliases to whatever model names are registered in the
+  proxy. ANTHROPIC_API_KEY is intentionally NOT forwarded in this mode —
+  Claude Code docs are explicit that the auth token, not the API key, is
+  the credential to use against a third-party base URL.
 """
 import json
+import os
 import subprocess
+
+from config import settings
 
 
 class ClaudeCodeError(Exception):
     pass
+
+
+def _build_env() -> dict:
+    env = os.environ.copy()
+
+    if settings.using_litellm:
+        env["ANTHROPIC_BASE_URL"] = settings.litellm_base_url
+        env["ANTHROPIC_AUTH_TOKEN"] = settings.litellm_api_key
+        if settings.anthropic_model:
+            env["ANTHROPIC_MODEL"] = settings.anthropic_model
+        if settings.anthropic_small_fast_model:
+            env["ANTHROPIC_SMALL_FAST_MODEL"] = settings.anthropic_small_fast_model
+        env.pop("ANTHROPIC_API_KEY", None)
+    else:
+        env["ANTHROPIC_API_KEY"] = settings.anthropic_api_key
+
+    return env
 
 
 def run_claude_code(
@@ -53,6 +83,7 @@ def run_claude_code(
             capture_output=True,
             text=True,
             timeout=timeout,
+            env=_build_env(),
         )
     except subprocess.TimeoutExpired as e:
         raise ClaudeCodeError(f"Claude Code timed out after {timeout}s") from e
