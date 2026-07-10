@@ -105,7 +105,14 @@ state keys it updates (LangGraph merges them in):
 - **`fixer.py`** — the only node that invokes real Claude Code (via
   `claude_code_runner.run_claude_code`), because it's the only step that needs
   repo-aware file edits. Receives review notes on the first pass, and additionally the
-  last test failure output on retries.
+  last test failure output on retries. If `DIFF_ONLY_MODE` is set (`config.py`,
+  default off), `_extract_changed_files` parses the triggering diff's `diff --git a/..
+  b/..` lines and both names those files in the prompt and scopes `allowedTools`'
+  `Edit` to just them (`Edit(path/to/file.py)` syntax) — `Bash`/`Read`/`Grep`/`Glob`
+  stay unscoped, so this narrows accidental edits but is **not** a hard security
+  boundary (Bash can still write anywhere). Falls back to the unscoped
+  `Read,Edit,Bash,Grep,Glob` if the mode is off or the diff doesn't parse to any
+  files.
 - **`tester.py`** — shells out to `pytest -x --tb=short` in the cloned repo by default,
   or to whatever `test_command` a `.overseer.yaml` at the target repo's root specifies
   (parsed with `shlex.split`), letting non-Python target repos plug in their own test
@@ -132,10 +139,16 @@ All six node functions are decorated with Langfuse's `@observe()` (from the `lan
 package), named after their graph node (`review`, `fix`, `test`, `security`, `approval`,
 `deploy`). `main.py:_run_pipeline` wraps the `overseer_graph.invoke(...)` call in
 `propagate_attributes(session_id=run_id, ...)` so every node trace for a given run groups
-under one Langfuse session instead of six disconnected traces. This is inert unless
-`LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` are set — with no credentials the SDK logs a
-warning and no-ops rather than failing the pipeline (verified: no exception, no blocking,
-even with an unreachable Langfuse host — export happens async in the background).
+under one Langfuse session instead of six disconnected traces. This is fully inert (no
+network activity) only when `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_HOST`
+are all genuinely *unset* — verified the SDK logs a warning and no-ops in that case. An
+*empty-string* env var (`LANGFUSE_PUBLIC_KEY=` present but blank) is not equivalent: the
+SDK treats presence as "configured" and attempts real background export retries against
+its default cloud host, failing with a harmless-but-noisy 401 (never blocks or throws —
+export happens async). Since `docker-compose.yml`'s `env_file: .env` loads whatever's
+uncommented in `.env`, `.env.example` ships all three Langfuse vars *commented out* by
+default, not just blank, to actually get the clean-disabled path — uncomment all three
+together only when running the `langfuse` compose service.
 
 ### Bounded-loop governance
 

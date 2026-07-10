@@ -347,10 +347,15 @@ simplifications, called out on purpose rather than hidden:
   full self-hosted setup needs its own secrets (NEXTAUTH_SECRET, SALT,
   ENCRYPTION_KEY) — see comments in `docker-compose.yml`. Every node is
   `@observe()`-decorated and grouped into one Langfuse session per run
-  (`orchestrator/main.py`'s `propagate_attributes` wrap), but tracing itself
-  is inert until `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` are set — no
-  credentials means the SDK logs a warning and no-ops, it doesn't fail the
-  pipeline.
+  (`orchestrator/main.py`'s `propagate_attributes` wrap). Tracing never fails
+  the pipeline either way, but it's only fully inert (no network activity)
+  when `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_HOST` are
+  genuinely *unset* — an empty-string var (present but blank) is treated by
+  the SDK as "configured" and triggers real, harmless-but-noisy background
+  export retries against its default cloud host. Since `env_file: .env`
+  loads whatever's uncommented, `.env.example` ships all three Langfuse vars
+  **commented out**, not just blank, so tracing is actually inert by
+  default.
 - **CrewAI agents use the Anthropic API directly** (via `ANTHROPIC_API_KEY`)
   for reasoning tasks (review, security triage) in Mode A, or the LiteLLM
   proxy in Mode B. Claude Code itself is only invoked for the Fixer step,
@@ -369,8 +374,6 @@ simplifications, called out on purpose rather than hidden:
 
 - Swap poll-based approval for LangGraph `interrupt()` + Postgres checkpointer
 - Replace socket-mounted runner with rootless Docker-in-Docker
-- Add a `--diff-only` mode so Reviewer/Fixer only touch changed files, not
-  the whole repo, to control Claude Code token spend
 - Add per-team budget/quota controls on Claude Code and CrewAI API usage,
   the same way a cloud FinOps layer caps spend per team
 
@@ -378,6 +381,16 @@ Done since the list above was first written:
 - ~~Add Langfuse tracing calls in each node (`@observe()` decorator)~~ — every
   node is now `@observe()`-decorated and grouped per-run into one Langfuse
   session (see "What's Real vs. Simplified" above).
+- ~~Add a `--diff-only` mode so Reviewer/Fixer only touch changed files, not
+  the whole repo, to control Claude Code token spend~~ — implemented as
+  `DIFF_ONLY_MODE` (see `.env.example`), **off by default**. Unlike the two
+  items above, this one is a soft constraint, not a settled improvement:
+  Fixer's `Edit` permission gets scoped to the diff's changed files and the
+  prompt names them up front, but `Bash` stays unscoped (Fixer needs it, and
+  Bash can write files too, so this isn't a hard boundary), and narrowing
+  Fixer's visibility can cost it context it needs on some fixes. Validate
+  the actual token-savings/context tradeoff against a real run before
+  turning it on.
 - ~~Make the test command configurable per target repo (`.overseer.yaml`)~~ —
   `tester.py` now reads `test_command` from a `.overseer.yaml` at the target
   repo's root, falling back to `pytest -x --tb=short` if absent.

@@ -27,6 +27,15 @@ class Settings:
     max_fix_attempts: int = int(os.environ.get("MAX_FIX_ATTEMPTS", "3"))
     approval_timeout_seconds: int = int(os.environ.get("APPROVAL_TIMEOUT_SECONDS", "1800"))
 
+    # Scopes the Fixer's Claude Code Edit permission to only the files
+    # touched by the triggering diff, and tells it up front which files
+    # those are — see nodes/fixer.py. Off by default: this is a soft,
+    # prompt/allowedTools-level constraint (Bash stays unscoped, so it's
+    # not a hard security boundary), and narrowing Fixer's visibility can
+    # cost it useful context on some fixes. Validate the token-savings
+    # tradeoff against your own runs before turning this on.
+    diff_only_mode: bool = os.environ.get("DIFF_ONLY_MODE", "false").lower() == "true"
+
     registry_url: str = os.environ.get("REGISTRY_URL", "localhost:5000")
 
     @property
