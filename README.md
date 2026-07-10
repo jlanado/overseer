@@ -168,7 +168,15 @@ always reflects the true end state of a run.
 
 ```bash
 cp .env.example .env
-# edit .env: set ANTHROPIC_API_KEY, POSTGRES_PASSWORD, WEBHOOK_SECRET
+# Pick a model backend (see "Model backend modes" below for details):
+#   - Local inference (the values .env.example ships with): point
+#     LITELLM_BASE_URL at your LiteLLM proxy in front of Ollama, and fill in
+#     LITELLM_API_KEY / ANTHROPIC_MODEL / ANTHROPIC_SMALL_FAST_MODEL /
+#     REVIEWER_MODEL to match the models registered in that proxy.
+#   - No local inference available: leave the LITELLM_* block empty and set
+#     ANTHROPIC_API_KEY instead — Overseer falls back to the direct
+#     Anthropic API automatically (see config.py's `using_litellm` check).
+# Either way, also set POSTGRES_PASSWORD and WEBHOOK_SECRET.
 
 docker compose up -d postgres gitea registry
 # open http://localhost:3000, create admin account, enable Actions in site config if desired
@@ -223,7 +231,11 @@ Services once running:
 ### Model backend modes
 
 Overseer supports two backends, switched entirely via `.env` — no code
-changes needed:
+changes needed. `.env.example` ships pre-filled for Mode B (a LiteLLM proxy
+in front of local Ollama models) since that's the zero-cost default for
+running the full stack locally; switch to Mode A any time you want Claude
+Code's Fixer step running against real Claude models instead, or don't have
+local inference available:
 
 | Mode | Set in `.env` | Cost | Fixer quality |
 |---|---|---|---|
