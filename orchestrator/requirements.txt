@@ -9,3 +9,5 @@ GitPython==3.1.43
 bandit==1.7.9
 pytest==8.3.3
 httpx==0.27.2
+PyYAML==6.0.3
+langfuse==4.13.2
