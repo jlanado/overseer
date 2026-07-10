@@ -1,0 +1,12 @@
+.env
+.claude/settings.local.json
+__pycache__/
+*.pyc
+.venv/
+workspace/
+*.log
+.DS_Store
+gitea-data/
+pgdata/
+runner-data/
+langfuse-data/

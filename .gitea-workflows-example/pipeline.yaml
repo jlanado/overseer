@@ -1,0 +1,22 @@
+# Optional, lightweight lane: fast lint/test feedback via Gitea Actions,
+# separate from the Overseer orchestrator's agentic review/fix/deploy flow
+# (which is triggered directly by the repo's webhook, not by this workflow).
+#
+# Copy this file into a target repo at .gitea/workflows/pipeline.yaml.
+
+name: lint-and-test
+on: [push, pull_request]
+
+jobs:
+  quick-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install pytest flake8
+      - name: Lint
+        run: flake8 . --max-line-length=100 || true   # non-blocking, informational
+      - name: Test
+        run: pytest -x --tb=short
