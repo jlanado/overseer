@@ -32,6 +32,16 @@ def _verify_signature(body: bytes, signature: str | None) -> bool:
     return hmac.compare_digest(expected, signature)
 
 
+def _branch_from_ref(ref: str) -> str:
+    """Strip the leading refs/heads/ or refs/tags/ segment, preserving any
+    slashes in the branch/tag name itself (e.g. refs/heads/feature/foo ->
+    feature/foo, not foo)."""
+    for prefix in ("refs/heads/", "refs/tags/"):
+        if ref.startswith(prefix):
+            return ref[len(prefix):]
+    return ref
+
+
 def _clone_repo(repo_url: str, branch: str, run_id: str) -> str:
     dest = Path(settings.workspace_dir) / run_id
     if dest.exists():
@@ -120,7 +130,7 @@ async def webhook(
     payload = await request.json()
 
     repo_url = payload.get("repository", {}).get("clone_url")
-    branch = payload.get("ref", "refs/heads/main").split("/")[-1]
+    branch = _branch_from_ref(payload.get("ref", "refs/heads/main"))
     pr_number = payload.get("number")  # present on pull_request events
     commit_sha = (payload.get("after") or payload.get("pull_request", {}).get("head", {}).get("sha"))
 
