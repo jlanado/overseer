@@ -3,10 +3,13 @@ Fixer node: hands the Reviewer's notes (or the Tester's failure output, on
 retry) to Claude Code headlessly, so it can make real edits in the cloned
 repo working tree.
 """
+from langfuse import observe
+
 from state import PipelineState
 from claude_code_runner import run_claude_code, ClaudeCodeError
 
 
+@observe(name="fix")
 def fixer_node(state: PipelineState) -> dict:
     context = state.get("review_notes", "")
     if state.get("test_output"):

@@ -345,7 +345,12 @@ simplifications, called out on purpose rather than hidden:
   reviewing this for production readiness. Rootless DinD is the upgrade path.
 - **Langfuse is optional** (`docker compose --profile observability up`) since
   full self-hosted setup needs its own secrets (NEXTAUTH_SECRET, SALT,
-  ENCRYPTION_KEY) — see comments in `docker-compose.yml`.
+  ENCRYPTION_KEY) — see comments in `docker-compose.yml`. Every node is
+  `@observe()`-decorated and grouped into one Langfuse session per run
+  (`orchestrator/main.py`'s `propagate_attributes` wrap), but tracing itself
+  is inert until `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` are set — no
+  credentials means the SDK logs a warning and no-ops, it doesn't fail the
+  pipeline.
 - **CrewAI agents use the Anthropic API directly** (via `ANTHROPIC_API_KEY`)
   for reasoning tasks (review, security triage) in Mode A, or the LiteLLM
   proxy in Mode B. Claude Code itself is only invoked for the Fixer step,
@@ -363,14 +368,19 @@ simplifications, called out on purpose rather than hidden:
 ## Going to Production
 
 - Swap poll-based approval for LangGraph `interrupt()` + Postgres checkpointer
-- Add Langfuse tracing calls in each node (`@observe()` decorator)
 - Replace socket-mounted runner with rootless Docker-in-Docker
 - Add a `--diff-only` mode so Reviewer/Fixer only touch changed files, not
   the whole repo, to control Claude Code token spend
-- Make the test command configurable per target repo (`.overseer.yaml`)
-  instead of hardcoding `pytest`
 - Add per-team budget/quota controls on Claude Code and CrewAI API usage,
   the same way a cloud FinOps layer caps spend per team
+
+Done since the list above was first written:
+- ~~Add Langfuse tracing calls in each node (`@observe()` decorator)~~ — every
+  node is now `@observe()`-decorated and grouped per-run into one Langfuse
+  session (see "What's Real vs. Simplified" above).
+- ~~Make the test command configurable per target repo (`.overseer.yaml`)~~ —
+  `tester.py` now reads `test_command` from a `.overseer.yaml` at the target
+  repo's root, falling back to `pytest -x --tb=short` if absent.
 
 ---
 
@@ -390,7 +400,7 @@ overseer/
 │   └── nodes/
 │       ├── reviewer.py    # CrewAI agent
 │       ├── fixer.py       # Claude Code headless call
-│       ├── tester.py      # pytest runner
+│       ├── tester.py      # test runner (pytest default, .overseer.yaml override)
 │       ├── security.py    # bandit runner
 │       ├── approval.py    # poll Postgres for human decision
 │       └── deploy.py      # docker compose up on target repo

@@ -10,6 +10,7 @@ import json
 import re
 
 from crewai import Agent, Task, Crew, LLM
+from langfuse import observe
 
 from state import PipelineState
 from config import settings
@@ -45,6 +46,7 @@ def _strip_reasoning_trace(text: str) -> str:
     return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
 
+@observe(name="review")
 def review_node(state: PipelineState) -> dict:
     task = Task(
         description=(

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import git
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
+from langfuse import propagate_attributes
 
 from config import settings
 from db import create_run, update_run
@@ -70,7 +71,11 @@ def _run_pipeline(run_id: str, repo_url: str, branch: str, pr_number: int | None
 
     config = {"configurable": {"thread_id": run_id}}
     try:
-        final_state = overseer_graph.invoke(initial_state, config=config)
+        # Groups every node's @observe() trace (see nodes/*.py) under one
+        # Langfuse session per pipeline run, so a run's full review->deploy
+        # path shows up together instead of as disconnected traces.
+        with propagate_attributes(session_id=run_id, trace_name="overseer-pipeline"):
+            final_state = overseer_graph.invoke(initial_state, config=config)
         status = "deployed" if final_state.get("deployed") else (
             "rejected" if final_state.get("approved") is False else "failed"
         )

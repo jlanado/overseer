@@ -10,11 +10,14 @@ state and resumes cleanly across restarts instead of blocking a thread.
 """
 import time
 
+from langfuse import observe
+
 from state import PipelineState
 from config import settings
 from db import update_run, get_run
 
 
+@observe(name="approval")
 def approval_node(state: PipelineState) -> dict:
     update_run(state["run_id"], status="awaiting_approval")
 

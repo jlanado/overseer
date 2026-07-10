@@ -49,11 +49,18 @@ actually patching code and Tester re-validating it.
 
 Run its tests directly: `cd example-target-app && pytest -x --tb=short`
 
-This is also literally the command the `tester` node (`orchestrator/nodes/tester.py`)
-runs against whatever repo it's pointed at — it's hardcoded to `pytest`, not yet
-configurable per-target-repo (see "Going to Production" in README.md).
+This is also literally the default command the `tester` node
+(`orchestrator/nodes/tester.py`) runs against whatever repo it's pointed at —
+`pytest -x --tb=short` unless the target repo has a `.overseer.yaml` at its
+root setting `test_command` to something else (e.g. `npm test -- --ci`).
+Falls back to the pytest default if that file is missing, unparseable, or
+doesn't set `test_command`.
 
-There is no test suite for the orchestrator itself in this MVP.
+`orchestrator/tests/` has a small pytest suite for the orchestrator's own
+logic: `test_graph.py` covers the four `route_after_*` routing functions in
+`graph.py` (including the `max_fix_attempts` retry cap), and `test_tester.py`
+covers the `.overseer.yaml` config-loading logic above. Run inside the built
+image: `docker compose run --rm orchestrator pytest tests/ -v`.
 
 ## Architecture
 
@@ -99,9 +106,10 @@ state keys it updates (LangGraph merges them in):
   `claude_code_runner.run_claude_code`), because it's the only step that needs
   repo-aware file edits. Receives review notes on the first pass, and additionally the
   last test failure output on retries.
-- **`tester.py`** — shells out to `pytest -x --tb=short` in the cloned repo. Hardcoded to
-  pytest; adapting to another target repo's language/test runner requires editing this
-  file directly (there's no per-repo config yet).
+- **`tester.py`** — shells out to `pytest -x --tb=short` in the cloned repo by default,
+  or to whatever `test_command` a `.overseer.yaml` at the target repo's root specifies
+  (parsed with `shlex.split`), letting non-Python target repos plug in their own test
+  runner without editing this file.
 - **`security.py`** — shells out to `bandit -r . -f json -ll` (medium+ severity only).
   **Fails closed**: if the scanner crashes or emits unparseable output, `security_passed`
   is `False`, not `True` — a broken scanner blocks the deploy rather than silently
@@ -119,6 +127,15 @@ Routing functions (`route_after_review`, `route_after_test`, `route_after_securi
 `route_after_approval`) are plain functions over `PipelineState`, registered via
 `graph.add_conditional_edges` — read these alongside `graph.py`'s module docstring
 (an ASCII diagram of the full state machine) to trace any control-flow question.
+
+All six node functions are decorated with Langfuse's `@observe()` (from the `langfuse`
+package), named after their graph node (`review`, `fix`, `test`, `security`, `approval`,
+`deploy`). `main.py:_run_pipeline` wraps the `overseer_graph.invoke(...)` call in
+`propagate_attributes(session_id=run_id, ...)` so every node trace for a given run groups
+under one Langfuse session instead of six disconnected traces. This is inert unless
+`LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` are set — with no credentials the SDK logs a
+warning and no-ops rather than failing the pipeline (verified: no exception, no blocking,
+even with an unreachable Langfuse host — export happens async in the background).
 
 ### Bounded-loop governance
 

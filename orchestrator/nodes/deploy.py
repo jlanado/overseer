@@ -6,10 +6,13 @@ see example-target-app/ for the minimal shape expected.
 """
 import subprocess
 
+from langfuse import observe
+
 from state import PipelineState
 from config import settings
 
 
+@observe(name="deploy")
 def deploy_node(state: PipelineState) -> dict:
     image_tag = f"{settings.registry_url}/{state['run_id']}:latest"
 

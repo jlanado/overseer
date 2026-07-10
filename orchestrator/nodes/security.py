@@ -6,9 +6,12 @@ multi-language) as your target repos diversify beyond Python.
 import json
 import subprocess
 
+from langfuse import observe
+
 from state import PipelineState
 
 
+@observe(name="security")
 def security_node(state: PipelineState) -> dict:
     try:
         result = subprocess.run(
